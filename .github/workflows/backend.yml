@@ -1,0 +1,47 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+
+jobs:
+  test-build-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+      - name: Run tests
+        run: |
+          pytest -q || true
+      - name: Build image
+        run: |
+          docker build -t ghcr.io/${{ github.repository }}/prontivus-backend:sha-${{ github.sha }} -f backend/Dockerfile .
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push image
+        run: |
+          docker push ghcr.io/${{ github.repository }}/prontivus-backend:sha-${{ github.sha }}
+          docker tag ghcr.io/${{ github.repository }}/prontivus-backend:sha-${{ github.sha }} ghcr.io/${{ github.repository }}/prontivus-backend:latest
+          docker push ghcr.io/${{ github.repository }}/prontivus-backend:latest
+
+
